@@ -41,7 +41,7 @@ class InfoSync(View):
     def get(self, request):
         bvid = request.GET.get("bv")
         data = cache.get(bvid)
-        if data:
+        if data.get("code") != 0:
             return JsonResponse({'success': True, 'data': data})
         bv = BvInfo.objects.filter(bvid=bvid).values()
         if bv:

@@ -3,11 +3,8 @@
 import json
 import re
 from multiprocessing.dummy import Pool
-
 import requests
 from django.core.cache import cache
-from django.http import JsonResponse
-
 from spider.models import BvInfo
 
 baseUrl = "https://www.bilibili.com/video/BV"
@@ -25,8 +22,10 @@ def get_bv(bv_name):
     if bv_name[:2].upper() == "BV":
         bv_name = bv_name[2:]
     url = "{0}{1}".format(baseUrl, bv_name)
-    print(url)
+    # print(url)
     response = requests.request("GET", url, headers=headers)
+    if response.status_code == 404:
+        raise Exception("找不到此bv号")
     if response.status_code != 200:
         raise Exception("请求失败，请求码为{}".format(response.status_code))
     try:
@@ -39,11 +38,13 @@ def get_bv(bv_name):
 
 def save_bv(bv_name):
     if bv_name[:2].upper() == "BV":
-        bv = "BV" + bv_name[2:]
-    bv = BvInfo.objects.get(bvid=bv_name)
-    if not bv:
+        bv_name = "BV" + bv_name[2:]
+    bv = BvInfo.objects.filter(bvid=bv_name)
+    if bv.count() == 0:
         bv = BvInfo()
-    data = get_bv(bv.bvid)
+    else:
+        bv = bv[0]
+    data = get_bv(bv_name)
     bv.avid = data["videoData"]["aid"]
     bv.bvid = data["videoData"]["bvid"]
     bv.desc = data["videoData"]["desc"]
@@ -62,7 +63,6 @@ def save_bv(bv_name):
     bv.own_mid = data["upData"]["mid"]
     bv.own_name = data["upData"]["name"]
     bv.save()
-    cache.set(bv.bvid, {"code": 0,})
     return {'success': True, 'msg': bv.title, 'bv': bv.bvid}
 
 
@@ -84,7 +84,7 @@ def get_bv_cache(bv_name):
 def save_bv_sync(bv_name):
     data = cache.get(bv_name)
     if data:
-        return {'success': True, 'msg': data.get('msg')}
+        return {'success': True, 'data': data}
     get_bv_cache(bv_name)
     return {'success': True, 'msg': '正在加载'}
 
